@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>ERシミュレーター｜虫垂炎</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --red: #E24B4A;
+    --red-light: #FCEBEB;
+    --red-border: #F09595;
+    --green: #1D9E75;
+    --green-light: #EAF3DE;
+    --green-border: #97C459;
+    --green-dark: #27500A;
+    --amber: #BA7517;
+    --amber-light: #FAEEDA;
+    --amber-border: #EF9F27;
+    --amber-dark: #412402;
+    --orange: #D85A30;
+    --orange-light: #FAECE7;
+    --bg: #F7F6F3;
+    --surface: #FFFFFF;
+    --surface2: #F1EFE8;
+    --border: rgba(0,0,0,0.10);
+    --border-strong: rgba(0,0,0,0.18);
+    --text: #1A1917;
+    --text-muted: #6B6A66;
+    --text-hint: #9E9D9A;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  html { background: var(--bg); }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* Header */
+  .app-header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(247,246,243,0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 0.5px solid var(--border);
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .er-badge {
+    background: var(--red); color: #fff;
+    font-size: 11px; font-weight: 700;
+    padding: 3px 9px; border-radius: 5px;
+    letter-spacing: 0.08em; font-family: 'IBM Plex Mono', monospace;
+  }
+  .header-title { font-size: 13px; color: var(--text-muted); font-weight: 400; }
+  .header-score {
+    margin-left: auto;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px; color: var(--text-muted);
+  }
+
+  /* Progress */
+  .progress-wrap { height: 3px; background: var(--surface2); }
+  .progress-fill {
+    height: 100%; background: var(--green);
+    transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+    width: 0%;
+  }
+
+  /* Main */
+  .main { padding: 20px 16px 40px; max-width: 520px; margin: 0 auto; }
+
+  /* Screen */
+  .screen { display: none; }
+  .screen.active { display: block; animation: fadeUp 0.3s ease; }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+  /* Step indicator */
+  .step-indicator {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 18px;
+  }
+  .step-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--border-strong);
+    transition: background 0.3s;
+  }
+  .step-dot.done { background: var(--green); }
+  .step-dot.current { background: var(--red); width: 20px; border-radius: 3px; }
+  .step-label { font-size: 12px; color: var(--text-hint); margin-left: 4px; font-family: 'IBM Plex Mono', monospace; }
+
+  /* Patient card */
+  .patient-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .patient-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+  .patient-name { font-size: 18px; font-weight: 700; }
+  .patient-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .arrival-tag {
+    font-size: 11px; background: var(--red-light); color: var(--red);
+    padding: 3px 8px; border-radius: 5px; font-family: 'IBM Plex Mono', monospace;
+    white-space: nowrap;
+  }
+
+  .vitals-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .vital {
+    background: var(--surface2); border-radius: var(--radius-sm);
+    padding: 8px 4px; text-align: center;
+  }
+  .vital-val { font-size: 15px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
+  .vital-val.warn { color: var(--red); }
+  .vital-val.ok { color: var(--green); }
+  .vital-label { font-size: 10px; color: var(--text-hint); margin-top: 3px; line-height: 1.3; }
+
+  /* Chief complaint */
+  .chief-complaint {
+    background: var(--orange-light);
+    border-left: 3px solid var(--orange);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    font-size: 14px; color: #4A1B0C;
+    line-height: 1.7;
+  }
+  .chief-complaint::before {
+    content: '主訴';
+    display: block; font-size: 10px; font-weight: 700;
+    color: var(--orange); letter-spacing: 0.06em;
+    margin-bottom: 5px; font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* Exam findings */
+  .exam-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px; margin-bottom: 14px;
+    font-size: 13px; line-height: 1.8;
+  }
+  .exam-card .card-label {
+    font-size: 10px; font-weight: 700; color: var(--text-hint);
+    letter-spacing: 0.08em; margin-bottom: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .exam-positive { color: var(--red); font-weight: 500; }
+
+  /* Lab results */
+  .lab-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .lab-item {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+  }
+  .lab-name { font-size: 11px; color: var(--text-muted); margin-bottom: 3px; }
+  .lab-val { font-size: 16px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
+  .lab-val.abnormal { color: var(--red); }
+  .lab-val.normal { color: var(--green); }
+  .lab-unit { font-size: 11px; color: var(--text-hint); font-weight: 400; }
+  .lab-arrow { font-size: 12px; }
+
+  .ct-result {
+    background: #0C447C11;
+    border: 0.5px solid #378ADD44;
+    border-radius: var(--radius-sm);
+    padding: 10px 14px; margin-bottom: 14px;
+    font-size: 13px; line-height: 1.7;
+  }
+  .ct-result .card-label { font-size: 10px; font-weight: 700; color: #185FA5; letter-spacing: 0.08em; margin-bottom: 6px; font-family: 'IBM Plex Mono', monospace; }
+
+  /* Section label */
+  .section-label {
+    font-size: 13px; font-weight: 700;
+    margin: 20px 0 12px;
+    padding-left: 10px;
+    border-left: 3px solid var(--red);
+  }
+
+  /* Choices */
+  .choices { display: flex; flex-direction: column; gap: 8px; }
+  .choice-btn {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 13px 14px;
+    text-align: left; font-size: 14px;
+    cursor: pointer; width: 100%;
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 10px;
+    -webkit-appearance: none;
+  }
+  .choice-btn:active { transform: scale(0.98); }
+  .choice-letter {
+    width: 26px; height: 26px; min-width: 26px;
+    border-radius: 50%; border: 1.5px solid var(--border-strong);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; font-family: 'IBM Plex Mono', monospace;
+    color: var(--text-muted);
+    transition: all 0.15s;
+  }
+  .choice-btn.selected .choice-letter { background: #1A1917; border-color: #1A1917; color: #fff; }
+  .choice-btn.correct { background: var(--green-light); border-color: var(--green-border); }
+  .choice-btn.correct .choice-letter { background: var(--green); border-color: var(--green); color: #fff; }
+  .choice-btn.wrong { background: var(--red-light); border-color: var(--red-border); }
+  .choice-btn.wrong .choice-letter { background: var(--red); border-color: var(--red); color: #fff; }
+  .choice-btn.reveal { background: var(--green-light); border-color: var(--green-border); }
+  .choice-btn.reveal .choice-letter { background: var(--green); border-color: var(--green); color: #fff; }
+  .choice-btn:disabled { cursor: default; }
+
+  .multi-hint { font-size: 12px; color: var(--text-hint); margin-bottom: 10px; }
+
+  /* Submit */
+  .submit-btn {
+    width: 100%; margin-top: 12px;
+    background: var(--text); color: #fff;
+    border: none; border-radius: var(--radius-sm);
+    padding: 14px; font-size: 15px; font-weight: 500;
+    cursor: pointer; font-family: 'Noto Sans JP', sans-serif;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .submit-btn:active { transform: scale(0.98); opacity: 0.85; }
+  .submit-btn:disabled { background: var(--border-strong); cursor: default; }
+
+  /* Feedback */
+  .feedback {
+    border-radius: var(--radius-sm);
+    padding: 14px; margin-top: 12px;
+    font-size: 13px; line-height: 1.7; display: none;
+  }
+  .feedback.correct { background: var(--green-light); border: 0.5px solid var(--green-border); }
+  .feedback.partial { background: var(--amber-light); border: 0.5px solid var(--amber-border); }
+  .feedback.wrong { background: var(--red-light); border: 0.5px solid var(--red-border); }
+  .feedback-badge {
+    display: inline-block; font-size: 11px; font-weight: 700;
+    padding: 2px 10px; border-radius: 4px; margin-bottom: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .feedback.correct .feedback-badge { background: var(--green); color: #fff; }
+  .feedback.partial .feedback-badge { background: var(--amber); color: #fff; }
+  .feedback.wrong .feedback-badge { background: var(--red); color: #fff; }
+
+  /* Next button */
+  .next-btn {
+    width: 100%; margin-top: 12px;
+    background: var(--surface);
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 14px; font-size: 15px;
+    cursor: pointer; color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    display: none; font-weight: 500;
+    transition: background 0.15s;
+  }
+  .next-btn:active { background: var(--surface2); }
+
+  /* AI section */
+  .ai-label {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--text-muted); margin-bottom: 10px;
+  }
+  .ai-icon {
+    width: 22px; height: 22px; background: var(--text);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  }
+  .ai-icon svg { width: 12px; height: 12px; fill: #fff; }
+
+  textarea {
+    width: 100%; background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px; font-size: 14px;
+    color: var(--text); resize: none; min-height: 90px;
+    font-family: 'Noto Sans JP', sans-serif;
+    margin-bottom: 8px; line-height: 1.6;
+    -webkit-appearance: none;
+  }
+  textarea:focus { outline: none; border-color: var(--border-strong); }
+
+  .ai-response {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px; margin-top: 12px;
+    font-size: 13px; line-height: 1.8;
+    display: none;
+  }
+  .ai-response-label {
+    font-size: 10px; font-weight: 700; color: var(--text-hint);
+    letter-spacing: 0.08em; margin-bottom: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .loading-dots {
+    display: none; align-items: center; gap: 8px;
+    padding: 14px 0; color: var(--text-muted); font-size: 13px;
+  }
+  .loading-dots.show { display: flex; }
+  .dot { width: 5px; height: 5px; background: var(--text-hint); border-radius: 50%; animation: blink 1.2s infinite; }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%,80%,100%{transform:translateY(0);opacity:0.4} 40%{transform:translateY(-5px);opacity:1} }
+
+  /* Final screen */
+  .final-wrap { padding: 32px 0; text-align: center; }
+  .final-outcome {
+    display: inline-block;
+    background: #E1F5EE; border: 1px solid #5DCAA5;
+    border-radius: var(--radius); padding: 14px 28px;
+    margin-bottom: 24px;
+  }
+  .final-outcome-label { font-size: 12px; color: var(--green); font-weight: 700; letter-spacing: 0.06em; font-family: 'IBM Plex Mono', monospace; }
+  .final-outcome-text { font-size: 15px; margin-top: 4px; }
+  .score-ring {
+    width: 120px; height: 120px; margin: 0 auto 16px;
+    position: relative;
+  }
+  .score-ring svg { width: 120px; height: 120px; transform: rotate(-90deg); }
+  .score-ring circle { fill: none; stroke-width: 8; }
+  .score-ring .track { stroke: var(--surface2); }
+  .score-ring .fill { stroke: var(--green); stroke-linecap: round; transition: stroke-dashoffset 1s ease; }
+  .score-number {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    font-size: 28px; font-weight: 700; font-family: 'IBM Plex Mono', monospace;
+  }
+  .score-denom { font-size: 14px; color: var(--text-muted); }
+  .final-msg { font-size: 15px; margin-bottom: 28px; line-height: 1.7; color: var(--text-muted); }
+
+  .action-btns { display: flex; flex-direction: column; gap: 10px; }
+  .btn-primary {
+    background: var(--text); color: #fff;
+    border: none; border-radius: var(--radius-sm);
+    padding: 14px; font-size: 15px; font-weight: 500;
+    cursor: pointer; font-family: 'Noto Sans JP', sans-serif;
+    width: 100%;
+  }
+  .btn-secondary {
+    background: var(--surface); color: var(--text);
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 14px; font-size: 14px;
+    cursor: pointer; font-family: 'Noto Sans JP', sans-serif;
+    width: 100%;
+  }
+
+  /* Outcome tag */
+  .outcome-flow {
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px; margin-bottom: 14px;
+    font-size: 13px; line-height: 1.8;
+  }
+  .outcome-flow .card-label { font-size: 10px; font-weight: 700; color: var(--text-hint); letter-spacing: 0.08em; margin-bottom: 6px; font-family: 'IBM Plex Mono', monospace; }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <span class="er-badge">ER</span>
+  <span class="header-title">救急シミュレーター</span>
+  <span class="header-score" id="header-score">0 / 3</span>
+</header>
+<div class="progress-wrap"><div class="progress-fill" id="progress"></div></div>
+
+<main class="main">
+
+  <!-- STEP 1: 患者入室 -->
+  <div class="screen active" id="step1">
+    <div class="step-indicator">
+      <div class="step-dot current" id="dot1"></div>
+      <div class="step-dot" id="dot2"></div>
+      <div class="step-dot" id="dot3"></div>
+      <div class="step-dot" id="dot4"></div>
+      <span class="step-label">STEP 1 / 4</span>
+    </div>
+
+    <div class="patient-card">
+      <div class="patient-header">
+        <div>
+          <div class="patient-name">田中 健太</div>
+          <div class="patient-meta">28歳・男性　救急車搬送　23:14</div>
+        </div>
+        <span class="arrival-tag">来院</span>
+      </div>
+      <div class="vitals-grid">
+        <div class="vital">
+          <div class="vital-val warn">38.3°C</div>
+          <div class="vital-label">体温</div>
+        </div>
+        <div class="vital">
+          <div class="vital-val warn">102</div>
+          <div class="vital-label">脈拍/分</div>
+        </div>
+        <div class="vital">
+          <div class="vital-val ok">124/78</div>
+          <div class="vital-label">血圧 mmHg</div>
+        </div>
+        <div class="vital">
+          <div class="vital-val ok">98%</div>
+          <div class="vital-label">SpO₂</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chief-complaint">
+      昨日の夕方から右下腹部が痛い。最初はお臍の周りだったが、今は右下が一番痛い。吐き気もある。
+    </div>
+
+    <div class="section-label">Q1. まず何を行うか？（複数選択）</div>
+    <p class="multi-hint">※正しいと思うものを全て選んでから「回答する」を押してください</p>
+
+    <div class="choices">
+      <button class="choice-btn" onclick="toggleQ1(this,'A')" id="q1A">
+        <span class="choice-letter">A</span>問診の継続・身体診察
+      </button>
+      <button class="choice-btn" onclick="toggleQ1(this,'B')" id="q1B">
+        <span class="choice-letter">B</span>すぐにCT検査を指示する
+      </button>
+      <button class="choice-btn" onclick="toggleQ1(this,'C')" id="q1C">
+        <span class="choice-letter">C</span>末梢ルート確保・採血オーダー
+      </button>
+      <button class="choice-btn" onclick="toggleQ1(this,'D')" id="q1D">
+        <span class="choice-letter">D</span>経過観察のみ（帰宅させる）
+      </button>
+    </div>
+
+    <button class="submit-btn" onclick="checkQ1()">回答する</button>
+    <div class="feedback" id="q1-fb"></div>
+    <button class="next-btn" id="q1-next" onclick="goTo('step2')">次へ：身体診察 →</button>
+  </div>
+
+  <!-- STEP 2: 身体診察・検査 -->
+  <div class="screen" id="step2">
+    <div class="step-indicator">
+      <div class="step-dot done"></div>
+      <div class="step-dot current"></div>
+      <div class="step-dot"></div>
+      <div class="step-dot"></div>
+      <span class="step-label">STEP 2 / 4</span>
+    </div>
+
+    <div class="exam-card">
+      <div class="card-label">身体診察所見</div>
+      腹部：右下腹部に強い圧痛あり。筋性防御（+）。<br>
+      <span class="exam-positive">Blumberg徴候（反跳痛）陽性</span><br>
+      <span class="exam-positive">Rovsing徴候陽性</span><br>
+      腸蠕動音：やや低下。
+    </div>
+
+    <div class="section-label">Q2. 次に行うべき検査は？（1つ選択）</div>
+
+    <div class="choices">
+      <button class="choice-btn" onclick="selectQ2(this,'A')" id="q2A">
+        <span class="choice-letter">A</span>血算・生化学・CRP・尿検査のみ
+      </button>
+      <button class="choice-btn" onclick="selectQ2(this,'B')" id="q2B">
+        <span class="choice-letter">B</span>腹部エコー（超音波）のみ
+      </button>
+      <button class="choice-btn" onclick="selectQ2(this,'C')" id="q2C">
+        <span class="choice-letter">C</span>造影CTのみ（採血なし）
+      </button>
+      <button class="choice-btn" onclick="selectQ2(this,'D')" id="q2D">
+        <span class="choice-letter">D</span>採血（血算・CRP等）＋腹部造影CT
+      </button>
+    </div>
+
+    <div class="feedback" id="q2-fb"></div>
+    <button class="next-btn" id="q2-next" onclick="goTo('step3')">次へ：検査結果 →</button>
+  </div>
+
+  <!-- STEP 3: 検査結果・治療 -->
+  <div class="screen" id="step3">
+    <div class="step-indicator">
+      <div class="step-dot done"></div>
+      <div class="step-dot done"></div>
+      <div class="step-dot current"></div>
+      <div class="step-dot"></div>
+      <span class="step-label">STEP 3 / 4</span>
+    </div>
+
+    <div class="lab-grid">
+      <div class="lab-item">
+        <div class="lab-name">WBC</div>
+        <div class="lab-val abnormal">14,200 <span class="lab-unit">/μL</span> <span class="lab-arrow">↑</span></div>
+      </div>
+      <div class="lab-item">
+        <div class="lab-name">CRP</div>
+        <div class="lab-val abnormal">3.8 <span class="lab-unit">mg/dL</span> <span class="lab-arrow">↑</span></div>
+      </div>
+      <div class="lab-item">
+        <div class="lab-name">好中球比率</div>
+        <div class="lab-val abnormal">88% <span class="lab-arrow">↑</span></div>
+      </div>
+      <div class="lab-item">
+        <div class="lab-name">Hb / PLT</div>
+        <div class="lab-val normal">正常範囲</div>
+      </div>
+    </div>
+
+    <div class="ct-result">
+      <div class="card-label">造影CT所見</div>
+      虫垂径 <strong style="color:#E24B4A;">10mm以上</strong>に腫大、周囲脂肪織濃度上昇あり。<br>
+      穿孔・膿瘍形成なし。
+    </div>
+
+    <div class="section-label">Q3. この患者への初期対応は？（複数選択）</div>
+    <p class="multi-hint">※正しいと思うものを全て選んでください</p>
+
+    <div class="choices">
+      <button class="choice-btn" onclick="toggleQ3(this,'A')" id="q3A">
+        <span class="choice-letter">A</span>外科コンサルト（緊急手術の検討）
+      </button>
+      <button class="choice-btn" onclick="toggleQ3(this,'B')" id="q3B">
+        <span class="choice-letter">B</span>抗菌薬投与（セフメタゾール等）
+      </button>
+      <button class="choice-btn" onclick="toggleQ3(this,'C')" id="q3C">
+        <span class="choice-letter">C</span>絶飲食・輸液管理
+      </button>
+      <button class="choice-btn" onclick="toggleQ3(this,'D')" id="q3D">
+        <span class="choice-letter">D</span>鎮痛薬のみ投与して帰宅させる
+      </button>
+    </div>
+
+    <button class="submit-btn" onclick="checkQ3()">回答する</button>
+    <div class="feedback" id="q3-fb"></div>
+    <button class="next-btn" id="q3-next" onclick="goTo('step4')">次へ：AI解説・振り返り →</button>
+  </div>
+
+  <!-- STEP 4: AI解説 -->
+  <div class="screen" id="step4">
+    <div class="step-indicator">
+      <div class="step-dot done"></div>
+      <div class="step-dot done"></div>
+      <div class="step-dot done"></div>
+      <div class="step-dot current"></div>
+      <span class="step-label">STEP 4 / 4</span>
+    </div>
+
+    <div class="outcome-flow">
+      <div class="card-label">転帰</div>
+      緊急腹腔鏡下虫垂切除術施行。手術は成功し、術後経過良好。<br>
+      48時間後に退院予定。
+    </div>
+
+    <div class="section-label">AIに質問する（自由記述）</div>
+
+    <div class="ai-label">
+      <div class="ai-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-8v4h4l-5 8z"/></svg>
+      </div>
+      <span>今回の症例について何でも質問できます</span>
+    </div>
+
+    <textarea id="ai-question" placeholder="例：Alvaradoスコアについて教えてください。抗菌薬の選択理由は？穿孔例ではどう対応が変わる？"></textarea>
+    <button class="submit-btn" onclick="askAI()" id="ai-submit-btn">AIに質問する</button>
+
+    <div class="loading-dots" id="ai-loading">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      <span style="margin-left:4px;">解説を生成中...</span>
+    </div>
+
+    <div class="ai-response" id="ai-response">
+      <div class="ai-response-label">AI解説</div>
+      <div id="ai-response-text"></div>
+    </div>
+
+    <button class="next-btn" id="step4-next" onclick="goTo('final')" style="display:block; margin-top:20px;">結果を見る →</button>
+  </div>
+
+  <!-- FINAL -->
+  <div class="screen" id="final">
+    <div class="final-wrap">
+      <div class="final-outcome">
+        <div class="final-outcome-label">OUTCOME</div>
+        <div class="final-outcome-text">緊急手術　→　回復・退院</div>
+      </div>
+
+      <div class="score-ring">
+        <svg viewBox="0 0 120 120">
+          <circle class="track" cx="60" cy="60" r="52"/>
+          <circle class="fill" id="score-circle" cx="60" cy="60" r="52"
+            stroke-dasharray="326.7"
+            stroke-dashoffset="326.7"/>
+        </svg>
+        <div class="score-number" id="final-score-num">0<span class="score-denom">/3</span></div>
+      </div>
+
+      <div class="final-msg" id="final-msg"></div>
+
+      <div class="action-btns">
+        <button class="btn-primary" onclick="restart()">もう一度プレイする</button>
+        <button class="btn-secondary" onclick="shareApp()">このアプリをシェアする</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+const state = { q1sel: [], q2sel: null, q3sel: [], score: 0 };
+
+function goTo(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const p = {step1:14, step2:38, step3:64, step4:88, final:100};
+  document.getElementById('progress').style.width = (p[id]||0) + '%';
+  window.scrollTo({top:0, behavior:'smooth'});
+  if (id === 'final') showFinal();
+}
+
+function toggleQ1(btn, val) {
+  if (btn.disabled) return;
+  const i = state.q1sel.indexOf(val);
+  if (i > -1) { state.q1sel.splice(i,1); btn.classList.remove('selected'); }
+  else { state.q1sel.push(val); btn.classList.add('selected'); }
+}
+
+function toggleQ3(btn, val) {
+  if (btn.disabled) return;
+  const i = state.q3sel.indexOf(val);
+  if (i > -1) { state.q3sel.splice(i,1); btn.classList.remove('selected'); }
+  else { state.q3sel.push(val); btn.classList.add('selected'); }
+}
+
+function disableChoices(prefix, count) {
+  for(let i=0;i<count;i++) {
+    const letters = ['A','B','C','D'];
+    const el = document.getElementById(prefix + letters[i]);
+    if (el) el.disabled = true;
+  }
+}
+
+function checkQ1() {
+  if (state.q1sel.length === 0) return;
+  disableChoices('q1', 4);
+  document.querySelector('#step1 .submit-btn').disabled = true;
+
+  const correct = ['A','C'];
+  const wrong = ['B','D'];
+  const sel = state.q1sel;
+
+  ['A','B','C','D'].forEach(l => {
+    const el = document.getElementById('q1'+l);
+    if (!el) return;
+    if (correct.includes(l) && sel.includes(l)) el.classList.add('correct');
+    else if (wrong.includes(l) && sel.includes(l)) el.classList.add('wrong');
+    else if (correct.includes(l)) el.classList.add('reveal');
+  });
+
+  const allCorrect = correct.every(c=>sel.includes(c)) && !sel.some(s=>wrong.includes(s));
+  const partial = correct.some(c=>sel.includes(c)) && !sel.some(s=>wrong.includes(s));
+
+  if (allCorrect) {
+    state.score++;
+    showFeedback('q1-fb','correct','正解！',
+      '問診・診察とルート確保・採血が正解です。発症様式（臍周囲→右下への痛みの移動）は虫垂炎の典型的な経過。末梢ルート確保は治療介入の準備として必須です。');
+  } else if (partial) {
+    showFeedback('q1-fb','partial','部分正解',
+      'AとCが正解です。いきなりCTは、診察所見なしに行うのは不適切です。まず問診・診察でAnscore（アルバラドスコア）的な評価を行いましょう。');
+  } else {
+    showFeedback('q1-fb','wrong','不正解',
+      'AとCが正解です。Dの経過観察のみは穿孔リスクがあり危険です。まずは問診・身体診察でどの程度の緊急性かを評価することが大切です。');
+  }
+  document.getElementById('q1-next').style.display = 'block';
+  updateHeaderScore();
+}
+
+function selectQ2(btn, val) {
+  if (btn.disabled) return;
+  disableChoices('q2', 4);
+  state.q2sel = val;
+
+  if (val === 'D') {
+    state.score++;
+    btn.classList.add('correct');
+    showFeedback('q2-fb','correct','正解！',
+      '採血と造影CTの両方が正解です。採血でWBC・CRP・好中球比率を確認し炎症の程度を評価。造影CTで虫垂の腫大・穿孔の有無・膿瘍形成を正確に診断します。若年男性では積極的にCTを撮影しましょう。');
+  } else {
+    btn.classList.add('wrong');
+    document.getElementById('q2D').classList.add('reveal');
+    showFeedback('q2-fb','wrong','不正解',
+      '正解はD（採血＋造影CT）です。採血のみでは重症度・穿孔の有無を判断できません。エコーは感度が術者依存で低く、単独での診断には不十分です。CT が虫垂炎診断のゴールドスタンダードです。');
+  }
+  document.getElementById('q2-next').style.display = 'block';
+  updateHeaderScore();
+}
+
+function checkQ3() {
+  if (state.q3sel.length === 0) return;
+  disableChoices('q3', 4);
+  document.querySelector('#step3 .submit-btn').disabled = true;
+
+  const correct = ['A','B','C'];
+  const sel = state.q3sel;
+
+  ['A','B','C','D'].forEach(l => {
+    const el = document.getElementById('q3'+l);
+    if (!el) return;
+    if (correct.includes(l) && sel.includes(l)) el.classList.add('correct');
+    else if (l==='D' && sel.includes('D')) el.classList.add('wrong');
+    else if (correct.includes(l)) el.classList.add('reveal');
+  });
+
+  const allCorrect = correct.every(c=>sel.includes(c)) && !sel.includes('D');
+  const partial = correct.some(c=>sel.includes(c)) && !sel.includes('D');
+
+  if (allCorrect) {
+    state.score++;
+    showFeedback('q3-fb','correct','正解！',
+      'A・B・C全て正解です。外科コンサルト（手術適応評価）、抗菌薬投与（グラム陰性菌・嫌気性菌カバー、例：セフメタゾール1g/回）、絶飲食・輸液（手術準備・脱水補正）はセットで行います。');
+  } else if (partial) {
+    showFeedback('q3-fb','partial','部分正解',
+      'A・B・Cの全てが必要です。特に抗菌薬は手術前から開始することでSSI（手術部位感染）を予防できます。絶飲食は麻酔導入に向けた必須の準備です。');
+  } else {
+    showFeedback('q3-fb','wrong','不正解',
+      'Dは誤りです。帰宅させると穿孔・腹膜炎へ進行するリスクがあります。A（外科コンサルト）・B（抗菌薬）・C（絶飲食・輸液）を全て行い、緊急手術の準備を進めましょう。');
+  }
+  document.getElementById('q3-next').style.display = 'block';
+  updateHeaderScore();
+}
+
+function showFeedback(id, type, label, text) {
+  const fb = document.getElementById(id);
+  fb.className = 'feedback ' + type;
+  fb.style.display = 'block';
+  fb.innerHTML = '<span class="feedback-badge">' + label + '</span><br>' + text;
+}
+
+function updateHeaderScore() {
+  document.getElementById('header-score').textContent = state.score + ' / 3';
+}
+
+async function askAI() {
+  const q = document.getElementById('ai-question').value.trim();
+  if (!q) return;
+  document.getElementById('ai-submit-btn').disabled = true;
+  document.getElementById('ai-loading').classList.add('show');
+  document.getElementById('ai-response').style.display = 'none';
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: 'あなたは日本のERで働くベテランの救急専門医です。日本の初期研修医（1〜2年目）に対して、救急外来での実践的な知識を教えています。虫垂炎の症例について質問に答えてください。回答は400字以内で、現場で即使える実践的なポイントを優先してください。専門用語には簡単な補足を加えてください。',
+        messages: [{ role: 'user', content: '虫垂炎の症例について質問です：' + q }]
+      })
+    });
+    const data = await res.json();
+    const text = (data.content || []).map(i => i.text || '').join('') || 'エラーが発生しました。';
+    document.getElementById('ai-response-text').textContent = text;
+    document.getElementById('ai-response').style.display = 'block';
+  } catch(e) {
+    document.getElementById('ai-response-text').textContent = 'API接続エラーが発生しました。';
+    document.getElementById('ai-response').style.display = 'block';
+  }
+
+  document.getElementById('ai-loading').classList.remove('show');
+  document.getElementById('ai-submit-btn').disabled = false;
+}
+
+function showFinal() {
+  document.getElementById('final-score-num').innerHTML = state.score + '<span class="score-denom">/3</span>';
+  const msgs = [
+    'もう少し！解説をしっかり読んで復習しましょう。次回は必ず正解できます。',
+    '良い判断が多かったです。復習してさらに上を目指しましょう。',
+    '完璧な対応です！この判断力があれば現場でも即戦力として活躍できます。'
+  ];
+  document.getElementById('final-msg').textContent = msgs[Math.min(state.score, 2)];
+
+  const circumference = 326.7;
+  const offset = circumference - (state.score / 3) * circumference;
+  setTimeout(() => {
+    document.getElementById('score-circle').style.strokeDashoffset = offset;
+  }, 300);
+
+  updateHeaderScore();
+}
+
+function restart() {
+  state.q1sel = []; state.q2sel = null; state.q3sel = []; state.score = 0;
+  ['q1A','q1B','q1C','q1D','q2A','q2B','q2C','q2D','q3A','q3B','q3C','q3D'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.className = 'choice-btn'; el.disabled = false; }
+  });
+  ['q1-fb','q2-fb','q3-fb'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+  ['q1-next','q2-next','q3-next'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+  document.querySelectorAll('.submit-btn').forEach(b => b.disabled = false);
+  document.getElementById('ai-question').value = '';
+  document.getElementById('ai-response').style.display = 'none';
+  document.getElementById('score-circle').style.strokeDashoffset = '326.7';
+  updateHeaderScore();
+  goTo('step1');
+}
+
+function shareApp() {
+  if (navigator.share) {
+    navigator.share({ title: 'ERシミュレーター｜虫垂炎', text: '救急初期対応シミュレーターで虫垂炎の対応を学ぼう！' });
+  } else {
+    alert('このHTMLファイルをLINEやメールで共有してください。');
+  }
+}
+</script>
+</body>
+</html>
